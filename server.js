@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ============ ROUTES ============
+// ============ IMPORTS DES ROUTES ============
 const activitesRoutes = require('./modules/activites/routes');
 const destinationsRoutes = require('./modules/destinations/routes');
 const circuitsRoutes = require('./modules/circuits/routes');
@@ -25,7 +25,9 @@ const demandesRoutes = require('./modules/demandes/routes');
 const prestatairesRoutes = require('./modules/prestataires/routes');
 const propositionsRoutes = require('./modules/propositions/routes');
 const alertesRoutes = require('./modules/alertes/routes');
+const utilisateursRoutes = require('./modules/utilisateurs/routes'); // <-- IMPORT ICI
 
+// ============ ROUTES DE BASE ============
 app.get('/', (req, res) => {
   res.json({
     message: 'API Shams Tour',
@@ -37,7 +39,8 @@ app.get('/', (req, res) => {
       circuits: '/api/circuits',
       tarifs: '/api/tarifs',
       lieux: '/api/lieux',
-      trajets: '/api/trajets'
+      trajets: '/api/trajets',
+      utilisateurs: '/api/utilisateurs'
     }
   });
 });
@@ -46,6 +49,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// ============ BRANCHEMENT DES ROUTES ============
 app.use('/api/activites', activitesRoutes);
 app.use('/api/destinations', destinationsRoutes);
 app.use('/api/circuits', circuitsRoutes);
@@ -57,6 +61,7 @@ app.use('/api/demandes', demandesRoutes);
 app.use('/api/prestataires', prestatairesRoutes);
 app.use('/api/demandes', propositionsRoutes);
 app.use('/api/alertes', alertesRoutes);
+app.use('/api/utilisateurs', utilisateursRoutes); // <-- BRANCHEMENT ICI (tout en bas)
 
 // ============ DÉMARRAGE ============
 async function startServer() {
