@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 // ============ MIDDLEWARES ============
 app.use(cors());
+app.use('/uploads', express.static('uploads'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -25,7 +26,8 @@ const demandesRoutes = require('./modules/demandes/routes');
 const prestatairesRoutes = require('./modules/prestataires/routes');
 const propositionsRoutes = require('./modules/propositions/routes');
 const alertesRoutes = require('./modules/alertes/routes');
-const utilisateursRoutes = require('./modules/utilisateurs/routes'); // <-- IMPORT ICI
+const utilisateursRoutes = require('./modules/utilisateurs/routes'); 
+const photosRoutes = require('./modules/photos/routes');
 
 // ============ ROUTES DE BASE ============
 app.get('/', (req, res) => {
@@ -61,7 +63,8 @@ app.use('/api/demandes', demandesRoutes);
 app.use('/api/prestataires', prestatairesRoutes);
 app.use('/api/demandes', propositionsRoutes);
 app.use('/api/alertes', alertesRoutes);
-app.use('/api/utilisateurs', utilisateursRoutes); // <-- BRANCHEMENT ICI (tout en bas)
+app.use('/api/utilisateurs', utilisateursRoutes); 
+app.use('/api/photos', photosRoutes);
 
 // ============ DÉMARRAGE ============
 async function startServer() {
