@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Hôte : 127.0.0.1
--- Généré le : mer. 21 oct. 2026 à 22:19
+-- Généré le : ven. 23 oct. 2026 à 06:45
 -- Version du serveur : 10.4.32-MariaDB
 -- Version de PHP : 8.2.12
 
@@ -381,6 +381,14 @@ CREATE TABLE `photo` (
   `ordre` int(11) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Déchargement des données de la table `photo`
+--
+
+INSERT INTO `photo` (`id`, `activite_id`, `fichier`, `texte_alt`, `ordre`) VALUES
+(2, 5, 'photo-1792697072273.jpg', 'Photo de l\'activité', 0),
+(4, 5, 'photo-1792697462451.jpg', 'Photo de l\'activité', 0);
+
 -- --------------------------------------------------------
 
 --
@@ -433,6 +441,29 @@ INSERT INTO `proposition` (`id`, `demande_id`, `numero_version`, `date_creation`
 (2, 1, 2, '2026-10-12 18:51:26', 3, 80000, 'Prix : +69 500 Ar', NULL, NULL, NULL, NULL),
 (3, 1, 3, '2026-10-12 18:56:30', 1, 100000, 'Prix : +20 000 Ar', NULL, NULL, NULL, NULL),
 (4, 1, 4, '2026-10-12 18:57:10', 1, 180000, 'Prix : +80 000 Ar', NULL, NULL, NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `reinitialisation_pin`
+--
+
+CREATE TABLE `reinitialisation_pin` (
+  `id` int(11) NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `code_pin` varchar(6) NOT NULL,
+  `expiration` datetime NOT NULL,
+  `utilise` tinyint(1) DEFAULT 0,
+  `date_creation` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Déchargement des données de la table `reinitialisation_pin`
+--
+
+INSERT INTO `reinitialisation_pin` (`id`, `email`, `code_pin`, `expiration`, `utilise`, `date_creation`) VALUES
+(1, 'nanciah05@gmail.com', '107101', '2026-10-22 20:48:36', 0, '2026-10-22 20:33:36'),
+(2, 'nanciah05@gmail.com', '219897', '2026-10-22 20:48:40', 1, '2026-10-22 20:33:40');
 
 -- --------------------------------------------------------
 
@@ -516,6 +547,10 @@ INSERT INTO `trajet` (`id`, `lieu_depart_id`, `lieu_arrivee_id`, `duree_min`, `t
 CREATE TABLE `utilisateur` (
   `id` int(11) NOT NULL,
   `identifiant` varchar(50) NOT NULL,
+  `prenom` varchar(100) DEFAULT NULL,
+  `nom` varchar(100) DEFAULT NULL,
+  `email` varchar(150) DEFAULT NULL,
+  `sexe` enum('Homme','Femme') DEFAULT NULL,
   `mot_de_passe_hash` varchar(255) NOT NULL,
   `nom_complet` varchar(100) NOT NULL,
   `role` enum('administrateur','conseiller') NOT NULL DEFAULT 'conseiller',
@@ -528,9 +563,10 @@ CREATE TABLE `utilisateur` (
 -- Déchargement des données de la table `utilisateur`
 --
 
-INSERT INTO `utilisateur` (`id`, `identifiant`, `mot_de_passe_hash`, `nom_complet`, `role`, `statut`, `derniere_connexion`, `date_creation`) VALUES
-(1, 'admin', '$2b$10$UiyaPBZFNMl3845GsppceO0JHpI30LUKVIc9RenwDGE4Fyg5FfePq', 'Administrateur Shams Tour', 'administrateur', 'actif', '2026-10-21 23:12:41', '2026-10-09 09:36:37'),
-(3, 'conseiller', '$2b$10$o3Pqnw9LCQX86IjBS3NDQOYB7JePDYvJtXjNZvsoHv4GGJsLqwqfG', 'Conseiller Shams Tour', 'conseiller', 'actif', '2026-10-12 17:48:55', '2026-10-12 17:18:22');
+INSERT INTO `utilisateur` (`id`, `identifiant`, `prenom`, `nom`, `email`, `sexe`, `mot_de_passe_hash`, `nom_complet`, `role`, `statut`, `derniere_connexion`, `date_creation`) VALUES
+(1, 'admin', NULL, NULL, NULL, NULL, '$2b$10$UiyaPBZFNMl3845GsppceO0JHpI30LUKVIc9RenwDGE4Fyg5FfePq', 'Administrateur Shams Tour', 'administrateur', 'actif', '2026-10-22 20:32:10', '2026-10-09 09:36:37'),
+(3, 'conseiller', NULL, NULL, NULL, NULL, '$2b$10$o3Pqnw9LCQX86IjBS3NDQOYB7JePDYvJtXjNZvsoHv4GGJsLqwqfG', 'Conseiller Shams Tour', 'conseiller', 'actif', '2026-10-22 19:19:52', '2026-10-12 17:18:22'),
+(4, 'nanciah05245', 'Nanciah', 'Rakotoson', 'nanciah05@gmail.com', 'Femme', '$2b$10$HDijZBBV4aAeQzFy80Z/DO/7HxrCtA.VBn/kGxO/NKl4G.8EzqxEm', 'Nanciah Rakotoson', '', 'actif', '2026-10-22 21:51:43', '2026-10-22 20:31:36');
 
 --
 -- Index pour les tables déchargées
@@ -662,6 +698,12 @@ ALTER TABLE `proposition`
   ADD KEY `accord_recueilli_par` (`accord_recueilli_par`);
 
 --
+-- Index pour la table `reinitialisation_pin`
+--
+ALTER TABLE `reinitialisation_pin`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Index pour la table `tarif`
 --
 ALTER TABLE `tarif`
@@ -682,7 +724,8 @@ ALTER TABLE `trajet`
 --
 ALTER TABLE `utilisateur`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `identifiant` (`identifiant`);
+  ADD UNIQUE KEY `identifiant` (`identifiant`),
+  ADD UNIQUE KEY `email` (`email`);
 
 --
 -- AUTO_INCREMENT pour les tables déchargées
@@ -770,7 +813,7 @@ ALTER TABLE `periode_ouverture`
 -- AUTO_INCREMENT pour la table `photo`
 --
 ALTER TABLE `photo`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT pour la table `prestataire`
@@ -783,6 +826,12 @@ ALTER TABLE `prestataire`
 --
 ALTER TABLE `proposition`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT pour la table `reinitialisation_pin`
+--
+ALTER TABLE `reinitialisation_pin`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT pour la table `tarif`
@@ -800,7 +849,7 @@ ALTER TABLE `trajet`
 -- AUTO_INCREMENT pour la table `utilisateur`
 --
 ALTER TABLE `utilisateur`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Contraintes pour les tables déchargées
