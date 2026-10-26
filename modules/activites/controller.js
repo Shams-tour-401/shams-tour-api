@@ -4,19 +4,35 @@ const { pool } = require('../../config/db');
 // GET /api/activites - Liste toutes les activités
 async function getAllActivites(req, res) {
   try {
-    const [rows] = await pool.query(`
+    // 1. Récupérer toutes les activités
+    const [activites] = await pool.query(`
       SELECT a.*, l.nom AS lieu_nom
       FROM activite a
       JOIN lieu l ON a.lieu_id = l.id
       WHERE a.statut_actif = 1
       ORDER BY a.nom
     `);
-    res.json(rows);
+
+    // 2. Pour chaque activité, récupérer toutes ses photos
+    for (const act of activites) {
+      const [photos] = await pool.query(
+        'SELECT fichier FROM photo WHERE activite_id = ?', 
+        [act.id]
+      );
+      
+      // On crée un tableau d'URLs complètes
+      act.photos_urls = photos.map(p => `http://192.168.1.99:3000/uploads/${p.fichier}`);
+    }
+
+    res.json(activites);
   } catch (error) {
     console.error('Erreur getAllActivites :', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 }
+
+
+
 
 // GET /api/activites/:id - Détail d'une activité
 async function getActiviteById(req, res) {
@@ -33,7 +49,6 @@ async function getActiviteById(req, res) {
       return res.status(404).json({ error: 'Activité non trouvée' });
     }
 
-    // Récupérer les tarifs associés
     const [tarifs] = await pool.query(
       'SELECT * FROM tarif WHERE activite_id = ?',
       [id]
@@ -130,7 +145,6 @@ async function desactiverActivite(req, res) {
       [id]
     );
 
-    // Mettre à jour les circuits concernés
     await pool.query(`
       UPDATE circuit c
       SET c.statut = 'a_reviser'

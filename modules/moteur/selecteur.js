@@ -1,86 +1,127 @@
 // modules/moteur/selecteur.js
 const { pool } = require('../../config/db');
+const { calculerPrix } = require('./prix');
 
 async function selectionnerCircuits(criteres) {
   const {
-    destination_id = 1,
     nombre_jours,
     adultes = 2,
     enfants = 0,
     ages_enfants = [],
     envies = [],
     rythme,
-    profil
+    profil,
+    budget,
+    budget_type
   } = criteres;
 
-  // 1. Récupérer TOUS les circuits publiés pour voir ce qui se passe
-  let query = `SELECT * FROM circuit WHERE statut = 'publie'`;
-  const params = [];
-  
-  // Si une durée est demandée, on ne filtre pas tout de suite en SQL pour pouvoir expliquer
-  const [tousLesCircuits] = await pool.query(query, params);
+  const [tousLesCircuits] = await pool.query(`SELECT * FROM circuit WHERE statut = 'publie'`);
   const resultats = [];
   const rejets = [];
 
   for (const circuit of tousLesCircuits) {
-    // --- FILTRE 1 : Durée ---
+    // --- FILTRE 1 : Durée (Obligatoire) ---
     if (nombre_jours && circuit.duree_jours !== nombre_jours) {
-      rejets.push(`Circuit "${circuit.nom}" éliminé : durée ${circuit.duree_jours}j au lieu de ${nombre_jours}j`);
-      continue;
+      continue; // Pas de message de rejet pour ne pas polluer
     }
 
-    // --- FILTRE 2 : Âge des enfants ---
-    let compatibleAge = true;
-    let raisonAge = '';
-
+    // --- FILTRE 2 : Âge des enfants (Si enfants renseignés) ---
     if (ages_enfants && ages_enfants.length > 0) {
       const [elements] = await pool.query(`
-        SELECT a.nom AS activite_nom, a.age_min 
+        SELECT a.age_min 
         FROM element_jour ej
         JOIN jour_circuit jc ON ej.jour_circuit_id = jc.id
         JOIN activite a ON ej.activite_id = a.id
         WHERE jc.circuit_id = ?
       `, [circuit.id]);
 
+      let compatibleAge = true;
       for (const el of elements) {
-        if (el.age_min) {
-          const ageEnfantTropJeune = ages_enfants.find(age => age < el.age_min);
-          if (ageEnfantTropJeune !== undefined) {
-            compatibleAge = false;
-            raisonAge = `Circuit "${circuit.nom}" éliminé : l'activité "${el.activite_nom}" exige ${el.age_min} ans (enfant de ${ageEnfantTropJeune} ans)`;
-            break;
-          }
+        if (el.age_min && ages_enfants.some(age => age < el.age_min)) {
+          compatibleAge = false;
+          break;
         }
+      }
+      if (!compatibleAge) continue;
+    }
+
+    // --- CALCUL DU PRIX ESTIMÉ ---
+    const [elementsPrix] = await pool.query(`
+      SELECT a.nom AS activite_nom, t.prix_vente, t.unite
+      FROM element_jour ej
+      JOIN jour_circuit jc ON ej.jour_circuit_id = jc.id
+      LEFT JOIN activite a ON ej.activite_id = a.id
+      LEFT JOIN tarif t ON a.id = t.activite_id AND t.statut = 'confirme' AND t.unite = 'par_adulte'
+      WHERE jc.circuit_id = ? AND ej.type = 'activite'
+    `, [circuit.id]);
+
+    const activitesPourPrix = elementsPrix
+      .filter(e => e.prix_vente)
+      .map(e => ({
+        nom: e.activite_nom,
+        unite: e.unite,
+        prix_vente: e.prix_vente,
+        prix_enfant: Math.round(e.prix_vente / 2)
+      }));
+
+    const calcul = calculerPrix({
+      activites: activitesPourPrix,
+      adultes: adultes,
+      enfants: enfants,
+      agesEnfants: ages_enfants,
+      vehicule: { prix_vente: 200000, capacite: 4 },
+      fraisDossier: 20000
+    });
+
+    const prixEstime = calcul.total;
+
+    // --- FILTRE 3 : BUDGET (Si budget renseigné) ---
+    if (criteres.budget_min !== null && criteres.budget_max !== null) {
+      if (prixEstime < criteres.budget_min || prixEstime > criteres.budget_max) {
+        continue; // On élimine le circuit s'il est hors de la tranche
       }
     }
 
-    if (!compatibleAge) {
-      rejets.push(raisonAge);
-      continue;
-    }
-
-    // --- SCORING ---
+    // --- SCORING (Uniquement sur les critères choisis) ---
     let score = 0;
     const etiquettes = (circuit.etiquettes || '').split(',');
     const profils = (circuit.profils_adaptes || '').split(',');
 
-    for (const envie of envies) {
-      if (etiquettes.includes(envie)) score += 3;
+    // On ne score que si l'utilisateur a choisi des envies
+    if (envies && envies.length > 0) {
+      for (const envie of envies) {
+        if (etiquettes.includes(envie)) score += 3;
+      }
     }
-    
-    if (circuit.rythme === rythme) score += 2;
-    
-    if (profils.includes(profil)) score += 1;
 
-    resultats.push({ circuit, score });
+    // On ne score que si l'utilisateur a choisi un rythme
+    if (rythme && circuit.rythme === rythme) {
+      score += 2;
+    }
+
+    // On ne score que si l'utilisateur a choisi un profil
+    if (profil && profils.includes(profil)) {
+      score += 1;
+    }
+
+    resultats.push({ 
+      circuit, 
+      score, 
+      prix_estime: prixEstime,
+      // 👇 ON GARDE EN MÉMOIRE LES CRITÈRES QUI ONT MATCHÉ
+      criteres_matches: {
+        envies: envies.filter(e => etiquettes.includes(e)),
+        rythme: (rythme && circuit.rythme === rythme) ? rythme : null,
+        profil: (profil && profils.includes(profil)) ? profil : null
+      }
+    });
   }
 
   // Trier par score
   resultats.sort((a, b) => b.score - a.score);
   
-  // Retourner le top 3 et les raisons des rejets
   return {
-    circuits: resultats.slice(0, 3),
+    circuits: resultats.slice(0, 5), // On affiche jusqu'à 5 circuits
     rejets: rejets
   };
 }
