@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
 // 1. CONNEXION
 async function login(req, res) {
   try {
-    const { identifiant, mot_de_passe } = req.body; // identifiant = email pour les clients
+    const { identifiant, mot_de_passe } = req.body;
     if (!identifiant || !mot_de_passe) return res.status(400).json({ error: 'Champs requis' });
 
     const [rows] = await pool.query('SELECT * FROM utilisateur WHERE (email = ? OR identifiant = ?) AND statut = "actif"', [identifiant, identifiant]);
@@ -34,9 +34,22 @@ async function login(req, res) {
       { expiresIn: '24h' }
     );
 
-    res.json({ message: 'Connexion réussie', token, utilisateur: { id: utilisateur.id, nom: utilisateur.nom, prenom: utilisateur.prenom, email: utilisateur.email,sexe: utilisateur.sexe, role: utilisateur.role } });
+    res.json({ 
+      message: 'Connexion réussie', 
+      token, 
+      utilisateur: { 
+        id: utilisateur.id, 
+        nom: utilisateur.nom, 
+        prenom: utilisateur.prenom, 
+        email: utilisateur.email, 
+        sexe: utilisateur.sexe, 
+        role: utilisateur.role 
+      } 
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    // 👇 LOG D'ERREUR
+    console.error('❌ ERREUR LOGIN :', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
 }
 
@@ -60,11 +73,12 @@ async function register(req, res) {
 
     res.status(201).json({ message: 'Compte créé avec succès' });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('❌ ERREUR REGISTER :', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
 }
 
-// 3. MOT DE PASSE OUBLIÉ (Envoi du mail avec le PIN)
+// 3. MOT DE PASSE OUBLIÉ
 async function forgotPassword(req, res) {
   try {
     const { email } = req.body;
@@ -72,7 +86,7 @@ async function forgotPassword(req, res) {
     if (users.length === 0) return res.status(404).json({ error: 'Aucun compte associé à cet email' });
 
     const pin = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiration = new Date(Date.now() + 15 * 60000); // 15 minutes
+    const expiration = new Date(Date.now() + 15 * 60000);
 
     await pool.query(`INSERT INTO reinitialisation_pin (email, code_pin, expiration) VALUES (?, ?, ?)`, [email, pin, expiration]);
 
@@ -93,8 +107,8 @@ async function forgotPassword(req, res) {
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Code envoyé par email.' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'email.' });
+    console.error('❌ ERREUR FORGOT PASSWORD :', error);
+    res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'email.', details: error.message });
   }
 }
 
@@ -117,11 +131,10 @@ async function resetPassword(req, res) {
 
     res.json({ message: 'Mot de passe réinitialisé avec succès' });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('❌ ERREUR RESET PASSWORD :', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
 }
-
-
 
 async function getMe(req, res) {
   try {
@@ -132,7 +145,8 @@ async function getMe(req, res) {
     if (rows.length === 0) return res.status(404).json({ error: 'Utilisateur non trouvé' });
     res.json(rows[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('❌ ERREUR GETME :', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
 }
 
@@ -140,7 +154,7 @@ async function getMe(req, res) {
 async function updateProfil(req, res) {
   try {
     const { nom, prenom, email, sexe } = req.body;
-    const userId = req.utilisateur.id; // Récupéré via le middleware verifierToken
+    const userId = req.utilisateur.id;
 
     await pool.query(`
       UPDATE utilisateur 
@@ -150,11 +164,11 @@ async function updateProfil(req, res) {
 
     res.json({ message: 'Profil mis à jour avec succès' });
   } catch (error) {
-    console.error(error);
+    console.error('❌ ERREUR UPDATE PROFIL :', error);
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ error: 'Cet email est déjà utilisé par un autre compte' });
     }
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
 }
 
@@ -164,26 +178,22 @@ async function changePassword(req, res) {
     const { ancien_mot_de_passe, nouveau_mot_de_passe } = req.body;
     const userId = req.utilisateur.id;
 
-    // 1. Récupérer l'utilisateur
     const [rows] = await pool.query('SELECT mot_de_passe_hash FROM utilisateur WHERE id = ?', [userId]);
     
-    // 2. Vérifier l'ancien mot de passe
     const valide = await bcrypt.compare(ancien_mot_de_passe, rows[0].mot_de_passe_hash);
     if (!valide) {
       return res.status(400).json({ error: 'L\'ancien mot de passe est incorrect' });
     }
 
-    // 3. Hasher et enregistrer le nouveau
     const hash = await bcrypt.hash(nouveau_mot_de_passe, 10);
     await pool.query('UPDATE utilisateur SET mot_de_passe_hash = ? WHERE id = ?', [hash, userId]);
 
     res.json({ message: 'Mot de passe modifié avec succès' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('❌ ERREUR CHANGE PASSWORD :', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
 }
-
 
 module.exports = { 
   login, 
@@ -194,4 +204,3 @@ module.exports = {
   changePassword,
   getMe 
 };
-
