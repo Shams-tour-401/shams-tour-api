@@ -2,18 +2,27 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+// On prépare la configuration SSL
+let sslConfig = false;
+if (process.env.DB_SSL === 'true') {
+  sslConfig = {
+    rejectUnauthorized: true,
+    // On lit le certificat depuis la variable d'environnement
+    ca: process.env.DB_SSL_CA 
+  };
+}
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: process.env.DB_PORT || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'shams_tour',
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   charset: 'utf8mb4',
-  //  LIGNE CRUCIALE POUR AIVEN
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : false
+  ssl: sslConfig // On applique la config SSL
 });
 
 // Test de connexion
