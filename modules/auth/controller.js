@@ -19,7 +19,8 @@ async function login(req, res) {
     const { identifiant, mot_de_passe } = req.body;
     if (!identifiant || !mot_de_passe) return res.status(400).json({ error: 'Champs requis' });
 
-    const [rows] = await pool.query('SELECT * FROM utilisateur WHERE (email = ? OR identifiant = ?) AND statut = "actif"', [identifiant, identifiant]);
+    // 👇 GUILLEMETS SIMPLES ICI
+    const [rows] = await pool.query("SELECT * FROM utilisateur WHERE (email = ? OR identifiant = ?) AND statut = 'actif'", [identifiant, identifiant]);
     if (rows.length === 0) return res.status(401).json({ error: 'Identifiants incorrects' });
 
     const utilisateur = rows[0];
@@ -47,7 +48,6 @@ async function login(req, res) {
       } 
     });
   } catch (error) {
-    // 👇 LOG D'ERREUR
     console.error('❌ ERREUR LOGIN :', error);
     res.status(500).json({ error: 'Erreur serveur', details: error.message });
   }
@@ -66,6 +66,7 @@ async function register(req, res) {
     const identifiant = email.split('@')[0] + Math.floor(Math.random() * 1000);
     const nomComplet = `${prenom} ${nom}`;
 
+    // 👇 GUILLEMETS SIMPLES ICI
     await pool.query(`
       INSERT INTO utilisateur (identifiant, prenom, nom, nom_complet, email, sexe, mot_de_passe_hash, role, statut)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'client', 'actif')
