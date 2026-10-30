@@ -47,7 +47,7 @@ async function getPhotosByActivite(req, res) {
     // On renvoie l'URL complète pour que le mobile puisse l'afficher
     const photosAvecUrl = photos.map(p => ({
       ...p,
-      url: `http://192.168.1.99:3000/uploads/${p.fichier}` 
+      url: `https://shams-tour-api.onrender.com/uploads/${p.fichier}` 
     }));
     res.json(photosAvecUrl);
   } catch (error) {
