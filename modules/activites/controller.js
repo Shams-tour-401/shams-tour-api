@@ -21,7 +21,7 @@ async function getAllActivites(req, res) {
       );
       
       // On crée un tableau d'URLs complètes
-      act.photos_urls = photos.map(p => `http://192.168.1.99:3000/uploads/${p.fichier}`);
+      act.photos_urls = photos.map(p => `https://shams-tour-api.onrender.com/uploads/${p.fichier}`);
     }
 
     res.json(activites);
