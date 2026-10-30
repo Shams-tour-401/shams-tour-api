@@ -20,8 +20,8 @@ async function getAllActivites(req, res) {
         [act.id]
       );
       
-      // On crée un tableau d'URLs complètes
-      act.photos_urls = photos.map(p => `https://shams-tour-api.onrender.com/uploads/${p.fichier}`);
+      // 👇 MODIFICATION ICI : On utilise directement l'URL Cloudinary stockée en base
+      act.photos_urls = photos.map(p => p.fichier);
     }
 
     res.json(activites);
@@ -30,9 +30,6 @@ async function getAllActivites(req, res) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 }
-
-
-
 
 // GET /api/activites/:id - Détail d'une activité
 async function getActiviteById(req, res) {

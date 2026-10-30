@@ -1,20 +1,18 @@
+// modules/photos/controller.js
 const { pool } = require('../../config/db');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const cloudinary = require('cloudinary').v2;
 
-// Configuration de Multer (où et comment stocker)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    // On renomme le fichier pour éviter les doublons
-    cb(null, `photo-${Date.now()}${path.extname(file.originalname)}`);
-  }
+// Configuration de Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const upload = multer({ storage }).array('photos', 5); // Max 5 photos
+// On utilise memoryStorage pour garder l'image en mémoire avant de l'envoyer à Cloudinary
+const storage = multer.memoryStorage();
+const upload = multer({ storage }).array('photos', 5);
 
 // POST /api/photos/:activiteId
 async function uploadPhotos(req, res) {
@@ -25,15 +23,28 @@ async function uploadPhotos(req, res) {
     const { activiteId } = req.params;
     
     try {
-      // Enregistrer chaque fichier dans la base de données
       for (const file of req.files) {
+        // 👇 ENVOI VERS CLOUDINARY
+        const result = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: 'shams-tour' }, 
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          stream.end(file.buffer);
+        });
+
+        // On enregistre l'URL Cloudinary dans la base de données
         await pool.query(`
           INSERT INTO photo (activite_id, fichier, texte_alt)
           VALUES (?, ?, ?)
-        `, [activiteId, file.filename, 'Photo de l\'activité']);
+        `, [activiteId, result.secure_url, 'Photo de l\'activité']);
       }
       res.json({ message: 'Photos ajoutées avec succès' });
     } catch (error) {
+      console.error(error);
       res.status(500).json({ error: 'Erreur serveur' });
     }
   });
@@ -44,10 +55,11 @@ async function getPhotosByActivite(req, res) {
   try {
     const { activiteId } = req.params;
     const [photos] = await pool.query('SELECT * FROM photo WHERE activite_id = ?', [activiteId]);
-    // On renvoie l'URL complète pour que le mobile puisse l'afficher
+    
+    // On renvoie directement l'URL Cloudinary stockée dans 'fichier'
     const photosAvecUrl = photos.map(p => ({
       ...p,
-      url: `https://shams-tour-api.onrender.com/uploads/${p.fichier}` 
+      url: p.fichier 
     }));
     res.json(photosAvecUrl);
   } catch (error) {
@@ -59,16 +71,7 @@ async function getPhotosByActivite(req, res) {
 async function deletePhoto(req, res) {
   try {
     const { photoId } = req.params;
-    const [photos] = await pool.query('SELECT fichier FROM photo WHERE id = ?', [photoId]);
-    
-    if (photos.length > 0) {
-      // Supprimer le fichier physique
-      const chemin = path.join(__dirname, '../../uploads', photos[0].fichier);
-      if (fs.existsSync(chemin)) fs.unlinkSync(chemin);
-      
-      // Supprimer de la base
-      await pool.query('DELETE FROM photo WHERE id = ?', [photoId]);
-    }
+    await pool.query('DELETE FROM photo WHERE id = ?', [photoId]);
     res.json({ message: 'Photo supprimée' });
   } catch (error) {
     res.status(500).json({ error: 'Erreur serveur' });
