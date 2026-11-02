@@ -196,7 +196,7 @@ async function publierCircuit(req, res) {
     }
 
     await pool.query(
-      'UPDATE circuit SET statut = "publie" WHERE id = ?',
+      "UPDATE circuit SET statut = 'publie' WHERE id = ?",
       [id]
     );
 
