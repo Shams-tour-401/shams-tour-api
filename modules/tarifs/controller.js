@@ -147,7 +147,7 @@ async function verifierTarif(req, res) {
   try {
     const { id } = req.params;
     await pool.query(
-      'UPDATE tarif SET derniere_verification = CURDATE(), statut = "confirme" WHERE id = ?',
+      "UPDATE tarif SET derniere_verification = CURDATE(), statut = 'confirme' WHERE id = ?",
       [id]
     );
     res.json({ message: 'Tarif marqué comme vérifié' });
