@@ -94,7 +94,10 @@ async function changerMotDePasse(req, res) {
     res.json({ message: 'Mot de passe mis à jour avec succès.' });
   } catch (error) {
     console.error('Erreur changement mot de passe:', error);
-    res.status(500).json({ error: 'Erreur serveur lors du changement de mot de passe.' });
+    // ✅ Renvoie le message d'erreur réel pour le débogage
+    res.status(500).json({ 
+      error: error.message || 'Erreur serveur lors du changement de mot de passe.' 
+    });
   }
 }
 
@@ -102,5 +105,5 @@ module.exports = {
   getAllUtilisateurs, 
   createUtilisateur, 
   changerStatutUtilisateur,
-  changerMotDePasse // ✅ N'oublie pas d'exporter
+  changerMotDePasse
 };
