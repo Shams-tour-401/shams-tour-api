@@ -3,12 +3,11 @@ const router = express.Router();
 const controller = require('./controller');
 const { verifierToken, verifierRole } = require('../../middlewares/auth');
 
-// ✅ ROUTE ACCESSIBLE À TOUT UTILISATEUR CONNECTÉ (admin, conseiller, client)
-// On la place AVANT le router.use pour qu'elle ne soit pas bloquée par verifierRole('administrateur')
+// ✅ ROUTE ACCESSIBLE À TOUT UTILISATEUR CONNECTÉ
+// Placée AVANT le router.use pour ne pas être bloquée par verifierRole('administrateur')
 router.put('/mot-de-passe', verifierToken, controller.changerMotDePasse);
 
 // 🔒 ROUTES RÉSERVÉES À L'ADMINISTRATEUR
-// À partir d'ici, toutes les routes nécessitent le rôle administrateur
 router.use(verifierToken, verifierRole('administrateur'));
 
 router.get('/', controller.getAllUtilisateurs);
