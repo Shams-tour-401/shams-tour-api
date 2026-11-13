@@ -58,7 +58,7 @@ async function changerStatutUtilisateur(req, res) {
 // ✅ NOUVELLE FONCTION : PUT /api/utilisateurs/mot-de-passe
 async function changerMotDePasse(req, res) {
   try {
-    const userId = req.user.id; // Vient du middleware verifierToken
+    const userId = req.utilisateur.id;// Vient du middleware verifierToken
     const { ancien_mot_de_passe, nouveau_mot_de_passe } = req.body;
 
     if (!ancien_mot_de_passe || !nouveau_mot_de_passe) {
