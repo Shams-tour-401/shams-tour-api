@@ -55,16 +55,12 @@ async function changerStatutUtilisateur(req, res) {
   }
 }
 
-
-
-// ✅ NOUVELLE FONCTION : Changer son propre mot de passe
+// ✅ NOUVELLE FONCTION : PUT /api/utilisateurs/mot-de-passe
 async function changerMotDePasse(req, res) {
   try {
-    // req.user.id vient du middleware d'authentification (JWT)
-    const userId = req.user.id; 
+    const userId = req.user.id; // Vient du middleware verifierToken
     const { ancien_mot_de_passe, nouveau_mot_de_passe } = req.body;
 
-    // 1. Validation basique
     if (!ancien_mot_de_passe || !nouveau_mot_de_passe) {
       return res.status(400).json({ error: 'Tous les champs sont obligatoires.' });
     }
@@ -72,7 +68,6 @@ async function changerMotDePasse(req, res) {
       return res.status(400).json({ error: 'Le nouveau mot de passe doit faire au moins 6 caractères.' });
     }
 
-    // 2. Récupérer l'utilisateur en base
     const [rows] = await pool.query(
       'SELECT mot_de_passe_hash FROM utilisateur WHERE id = ?',
       [userId]
@@ -83,17 +78,14 @@ async function changerMotDePasse(req, res) {
     }
 
     const utilisateur = rows[0];
-
-    // 3. Vérifier que l'ancien mot de passe est correct
     const motDePasseValide = await bcrypt.compare(ancien_mot_de_passe, utilisateur.mot_de_passe_hash);
+    
     if (!motDePasseValide) {
       return res.status(401).json({ error: 'L\'ancien mot de passe est incorrect.' });
     }
 
-    // 4. Hasher le nouveau mot de passe
     const nouveauHash = await bcrypt.hash(nouveau_mot_de_passe, 10);
 
-    // 5. Mettre à jour la base
     await pool.query(
       'UPDATE utilisateur SET mot_de_passe_hash = ? WHERE id = ?',
       [nouveauHash, userId]
@@ -106,4 +98,9 @@ async function changerMotDePasse(req, res) {
   }
 }
 
-module.exports = { getAllUtilisateurs, createUtilisateur, changerStatutUtilisateur, changerMotDePasse };
+module.exports = { 
+  getAllUtilisateurs, 
+  createUtilisateur, 
+  changerStatutUtilisateur,
+  changerMotDePasse // ✅ N'oublie pas d'exporter
+};
