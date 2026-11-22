@@ -27,11 +27,19 @@ async function getCircuitById(req, res) {
     const [jours] = await pool.query('SELECT * FROM jour_circuit WHERE circuit_id = ? ORDER BY position', [id]);
 
     for (const jour of jours) {
+      // ✅ CORRECTION : sous-requête pour ne prendre qu'un seul tarif (évite les doublons)
       const [elements] = await pool.query(`
-        SELECT ej.*, a.nom AS activite_nom, a.duree_min AS activite_duree, t.prix_vente
+        SELECT 
+          ej.*, 
+          a.nom AS activite_nom, 
+          a.duree_min AS activite_duree,
+          (SELECT t.prix_vente FROM tarif t 
+           WHERE t.activite_id = a.id 
+             AND t.statut = 'confirme' 
+             AND t.unite = 'par_adulte' 
+           LIMIT 1) AS prix_vente
         FROM element_jour ej
         LEFT JOIN activite a ON ej.activite_id = a.id
-        LEFT JOIN tarif t ON a.id = t.activite_id AND t.statut = 'confirme' AND t.unite = 'par_adulte'
         WHERE ej.jour_circuit_id = ?
         ORDER BY ej.position
       `, [jour.id]);
@@ -40,6 +48,7 @@ async function getCircuitById(req, res) {
 
     res.json({ ...circuitRows[0], jours });
   } catch (error) {
+    console.error('Erreur getCircuitById :', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 }
@@ -267,7 +276,6 @@ async function rechercherCircuits(req, res) {
     const { calculerPrix } = require('../moteur/prix');
     const criteres = req.body;
     
-    // 1. Obtenir les circuits filtrés et classés par le moteur
     const resultatMoteur = await selectionnerCircuits(criteres);
     const { circuits, rejets } = resultatMoteur;
     
@@ -280,29 +288,39 @@ async function rechercherCircuits(req, res) {
       });
     }
 
-    // 2. Pour chaque circuit, on récupère le détail et on calcule le prix
     const reponse = await Promise.all(circuits.map(async (r) => {
       
-      // Récupérer les éléments du circuit
+      // ✅ CORRECTION : sous-requête pour ne prendre qu'un seul tarif (évite les doublons)
       const [elements] = await pool.query(`
-        SELECT ej.*, a.nom AS activite_nom, t.prix_vente, t.unite
+        SELECT 
+          ej.*, 
+          a.nom AS activite_nom,
+          (SELECT t.prix_vente FROM tarif t 
+           WHERE t.activite_id = a.id 
+             AND t.statut = 'confirme' 
+             AND t.unite = 'par_adulte' 
+           LIMIT 1) AS prix_vente,
+          (SELECT t.unite FROM tarif t 
+           WHERE t.activite_id = a.id 
+             AND t.statut = 'confirme' 
+             AND t.unite = 'par_adulte' 
+           LIMIT 1) AS unite
         FROM element_jour ej
         JOIN jour_circuit jc ON ej.jour_circuit_id = jc.id
         LEFT JOIN activite a ON ej.activite_id = a.id
-        LEFT JOIN tarif t ON a.id = t.activite_id AND t.statut = 'confirme'
         WHERE jc.circuit_id = ?
         ORDER BY jc.position, ej.position
       `, [r.circuit.id]);
 
-      // Préparer les données pour le moteur de prix
-      const activites = elements.filter(e => e.type === 'activite' && e.prix_vente).map(e => ({
-        nom: e.activite_nom,
-        unite: e.unite,
-        prix_vente: e.prix_vente,
-        prix_enfant: Math.round(e.prix_vente / 2)
-      }));
+      const activites = elements
+        .filter(e => e.type === 'activite' && e.prix_vente)
+        .map(e => ({
+          nom: e.activite_nom,
+          unite: e.unite,
+          prix_vente: e.prix_vente,
+          prix_enfant: Math.round(e.prix_vente / 2)
+        }));
 
-      // Calculer le prix
       const calcul = calculerPrix({
         activites,
         adultes: criteres.adultes || 2,
@@ -312,7 +330,6 @@ async function rechercherCircuits(req, res) {
         fraisDossier: 20000
       });
 
-      // 👇 GÉNÉRATION DES RAISONS DYNAMIQUES
       const raisons = [];
       if (r.criteres_matches && r.criteres_matches.envies && r.criteres_matches.envies.length > 0) {
         raisons.push(`vos envies de ${r.criteres_matches.envies.join(' et ')}`);
@@ -358,7 +375,12 @@ async function recalculerPrix(req, res) {
     const { elements, adultes, enfants, ages_enfants } = req.body;
     const { calculerPrix } = require('../moteur/prix');
 
-    const activites = elements
+    // ✅ Déduplique les éléments par id avant de calculer
+    const elementsUniques = Array.from(
+      new Map(elements.map(e => [e.id, e])).values()
+    );
+
+    const activites = elementsUniques
       .filter(e => e.type === 'activite' && e.prix_vente)
       .map(e => ({
         nom: e.activite_nom,
