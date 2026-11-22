@@ -27,7 +27,6 @@ async function getCircuitById(req, res) {
     const [jours] = await pool.query('SELECT * FROM jour_circuit WHERE circuit_id = ? ORDER BY position', [id]);
 
     for (const jour of jours) {
-      // ✅ CORRECTION : sous-requête pour ne prendre qu'un seul tarif (évite les doublons)
       const [elements] = await pool.query(`
         SELECT 
           ej.*, 
@@ -290,10 +289,11 @@ async function rechercherCircuits(req, res) {
 
     const reponse = await Promise.all(circuits.map(async (r) => {
       
-      // ✅ CORRECTION : sous-requête pour ne prendre qu'un seul tarif (évite les doublons)
+      // ✅ CORRECTION APPLIQUÉE ICI : ajout de "jc.position AS jour"
       const [elements] = await pool.query(`
         SELECT 
           ej.*, 
+          jc.position AS jour, 
           a.nom AS activite_nom,
           (SELECT t.prix_vente FROM tarif t 
            WHERE t.activite_id = a.id 
@@ -375,7 +375,6 @@ async function recalculerPrix(req, res) {
     const { elements, adultes, enfants, ages_enfants } = req.body;
     const { calculerPrix } = require('../moteur/prix');
 
-    // ✅ Déduplique les éléments par id avant de calculer
     const elementsUniques = Array.from(
       new Map(elements.map(e => [e.id, e])).values()
     );
